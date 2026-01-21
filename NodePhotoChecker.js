@@ -1,1 +1,139 @@
-javascript:(()=>{let paused=false,stopped=false,waitingForClick=true,lastHighlight=null,controlContainer=document.createElement('div');Object.assign(controlContainer.style,{position:'fixed',top:'10px',left:'10px',zIndex:99999,background:'rgba(0,0,0,0.7)',padding:'8px',borderRadius:'8px',display:'flex',gap:'4px'});const createButton=(text,handler,bg='green')=>{const btn=document.createElement('button');btn.textContent=text;Object.assign(btn.style,{padding:'4px 8px',fontSize:'12px',cursor:'pointer',background:bg,color:'#fff'});btn.addEventListener('click',handler);controlContainer.appendChild(btn);return btn;};const pauseBtn=createButton('Pause/Resume',()=>{},'green'),stopBtn=createButton('Stop',()=>{stopped=true;controlContainer.remove();console.log('Script stopped');});document.body.appendChild(controlContainer);document.addEventListener('keydown',e=>{if(e.ctrlKey&&!e.repeat){paused=!paused;pauseBtn.style.background=paused?'orange':'green';console.log(paused?'Script paused':'Script resumed');}});function findAllPhotoViewers(root,results=[]){if(!root)return results;function recurse(node){if(node.tagName==='KATAPULT-PHOTO-VIEWER')results.push(node);if(node.shadowRoot)recurse(node.shadowRoot);if(node.children)Array.from(node.children).forEach(recurse);}recurse(root);return results;}function highlightElement(el){const rect=el.getBoundingClientRect();const box=document.createElement('div');Object.assign(box.style,{position:'absolute',top:rect.top+'px',left:rect.left+'px',width:rect.width+'px',height:rect.height+'px',border:'3px solid red',background:'rgba(255,0,0,0.2)',zIndex:9999,pointerEvents:'none'});document.body.appendChild(box);return box;}function clickPhotoViewer(photo){photo.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));photo.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));photo.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));photo.dispatchEvent(new MouseEvent('click',{bubbles:true}));}document.addEventListener('click',async function handler(e){if(stopped)return document.removeEventListener('click',handler);if(paused)return;if(!waitingForClick)return;waitingForClick=false;if(lastHighlight){lastHighlight.remove();lastHighlight=null;}await new Promise(r=>setTimeout(r,150));const root=document.querySelector('#pageElement')?.shadowRoot||document.body;const viewers=findAllPhotoViewers(root);if(!viewers.length){console.log('No katapult-photo-viewer found');waitingForClick=true;return;}const photo=viewers[viewers.length-1];lastHighlight=highlightElement(photo);await new Promise(r=>setTimeout(r,100));clickPhotoViewer(photo);lastHighlight.remove();lastHighlight=null;console.log('Photo clicked by script');waitingForClick=true;})();})();
+javascript:(() => {
+  let paused = false;
+  let stopped = false;
+  let panelHandled = false;
+  let currentUUID = null;
+
+  /* ---------------- UI ---------------- */
+  const ui = document.createElement('div');
+  Object.assign(ui.style, {
+    position: 'fixed',
+    top: '10px',
+    left: '10px',
+    zIndex: 99999,
+    background: 'rgba(0,0,0,0.7)',
+    padding: '8px',
+    borderRadius: '8px',
+    display: 'flex',
+    gap: '6px'
+  });
+
+  const mkBtn = (txt, fn, bg) => {
+    const b = document.createElement('button');
+    b.textContent = txt;
+    Object.assign(b.style, {
+      padding: '4px 8px',
+      fontSize: '12px',
+      cursor: 'pointer',
+      background: bg,
+      color: '#fff'
+    });
+    b.onclick = fn;
+    ui.appendChild(b);
+    return b;
+  };
+
+  const pauseBtn = mkBtn('Pause (CTRL)', () => togglePause(), 'green');
+  mkBtn('Star (SHIFT)', () => starCurrent(), '#c49a00');
+  mkBtn('Stop', () => stopScript(), 'crimson');
+
+  document.body.appendChild(ui);
+
+  /* ---------------- Helpers ---------------- */
+  function findAllPhotoViewers(root, out = []) {
+    if (!root) return out;
+    if (root.tagName === 'KATAPULT-PHOTO-VIEWER') out.push(root);
+    if (root.shadowRoot) findAllPhotoViewers(root.shadowRoot, out);
+    if (root.children) [...root.children].forEach(c => findAllPhotoViewers(c, out));
+    return out;
+  }
+
+  function virtualClick(el) {
+    const r = el.getBoundingClientRect();
+    const x = r.left + r.width / 2;
+    const y = r.top + r.height / 2;
+    ['mouseover','mousedown','mouseup','click'].forEach(t =>
+      el.dispatchEvent(new MouseEvent(t, { bubbles:true, clientX:x, clientY:y }))
+    );
+  }
+
+  function clickLastThumbnail() {
+    if (paused || panelHandled) return;
+    const root = document.querySelector('#pageElement')?.shadowRoot;
+    if (!root) return;
+
+    const viewers = findAllPhotoViewers(root);
+    if (!viewers.length) return;
+
+    const last = viewers[viewers.length - 1];
+    panelHandled = true;
+    virtualClick(last);
+    console.log('Opened last thumbnail:', last.id);
+  }
+
+  function starCurrent() {
+    if (!currentUUID) return console.log('No focused photo UUID');
+    const root = document.querySelector('#pageElement')?.shadowRoot;
+    const panel = root?.querySelector('katapult-tool-panel#infoPanel')?.shadowRoot;
+    if (!panel) return;
+
+    const pv = [...panel.querySelectorAll('katapult-photo-viewer')].find(p => p.id === currentUUID);
+    const star = pv?.querySelector('iron-icon.mainPhotoBadge[icon="star"]');
+    if (!star) return console.log('Star icon not found');
+
+    star.click();
+    console.log('Star clicked for UUID:', currentUUID);
+  }
+
+  /* ---------------- Keyboard ---------------- */
+  function togglePause() {
+    paused = !paused;
+    pauseBtn.style.background = paused ? 'orange' : 'green';
+    console.log(paused ? 'Paused' : 'Resumed');
+  }
+
+  function keyHandler(e) {
+    if (e.repeat) return;
+    if (e.ctrlKey) togglePause();
+    if (e.key === 'Shift') starCurrent();
+  }
+
+  document.addEventListener('keydown', keyHandler);
+
+  /* ---------------- XHR Hook ---------------- */
+  const origOpen = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function (...args) {
+    this.addEventListener('load', () => {
+      if (stopped || paused) return;
+      const url = this.responseURL || '';
+
+      // panel opened → thumbnails ready
+      if (url.includes('small.webp')) {
+        panelHandled = false;
+        setTimeout(clickLastThumbnail, 50);
+      }
+
+      // fullscreen photo → capture UUID
+      if (url.includes('extra_large.webp')) {
+        const m = url.match(/photos%2F([a-f0-9-]+)_/i);
+        if (m) {
+          currentUUID = m[1];
+          console.log('Focused photo UUID:', currentUUID);
+        }
+      }
+    });
+    return origOpen.apply(this, args);
+  };
+
+  /* ---------------- Stop ---------------- */
+  function stopScript() {
+    stopped = true;
+    XMLHttpRequest.prototype.open = origOpen;
+    document.removeEventListener('keydown', keyHandler);
+    ui.remove();
+    console.log('Script stopped and cleaned up');
+  }
+
+  console.log('Listener active: small.webp → open last, large.webp → track UUID');
+})();
+
