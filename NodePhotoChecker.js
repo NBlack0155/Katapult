@@ -1,4 +1,4 @@
-javascript:(() => {
+(() => {
   let paused = false;
   let stopped = false;
   let panelHandled = false;
@@ -6,6 +6,7 @@ javascript:(() => {
 
   /* ---------------- UI ---------------- */
   const ui = document.createElement('div');
+  ui.id = 'katapultControlUI';
   Object.assign(ui.style, {
     position: 'fixed',
     top: '10px',
@@ -15,8 +16,26 @@ javascript:(() => {
     padding: '8px',
     borderRadius: '8px',
     display: 'flex',
-    gap: '6px'
+    flexDirection: 'column',
+    gap: '6px',
+    cursor: 'move' // indicate draggable
   });
+
+  // Drag logic for entire container
+  let dragOffsetX = 0, dragOffsetY = 0, dragging = false;
+  ui.addEventListener('mousedown', e => {
+    if(e.target.tagName === 'BUTTON') return; // buttons themselves not draggable
+    dragging = true;
+    const rect = ui.getBoundingClientRect();
+    dragOffsetX = e.clientX - rect.left;
+    dragOffsetY = e.clientY - rect.top;
+  });
+  document.addEventListener('mousemove', e => {
+    if(!dragging) return;
+    ui.style.left = (e.clientX - dragOffsetX) + 'px';
+    ui.style.top = (e.clientY - dragOffsetY) + 'px';
+  });
+  document.addEventListener('mouseup', () => dragging = false);
 
   const mkBtn = (txt, fn, bg) => {
     const b = document.createElement('button');
@@ -26,7 +45,8 @@ javascript:(() => {
       fontSize: '12px',
       cursor: 'pointer',
       background: bg,
-      color: '#fff'
+      color: '#fff',
+      borderRadius: '6px'
     });
     b.onclick = fn;
     ui.appendChild(b);
@@ -34,12 +54,74 @@ javascript:(() => {
   };
 
   const pauseBtn = mkBtn('Pause (CTRL)', () => togglePause(), 'green');
-  mkBtn('Star (SHIFT)', () => starCurrent(), '#c49a00');
-  mkBtn('Stop', () => stopScript(), 'crimson');
+  const starBtn = mkBtn('Star (SHIFT)', () => { starCurrent(); flash(starBtn); }, '#c49a00');
+  const stopBtn = mkBtn('Stop', () => stopScript(), 'crimson');
+
+  // WASD buttons under STOP
+  const wasdContainer = document.createElement('div');
+  Object.assign(wasdContainer.style, {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '6px'
+  });
+  ui.appendChild(wasdContainer);
+
+  const wBtn = mkBtn('W', () => { selectItem(index-1); flash(wBtn); }, '#444');
+  const aBtn = mkBtn('A', () => { fireIronKey('left'); flash(aBtn); }, '#444');
+  const sBtn = mkBtn('S', () => { selectItem(index+1); flash(sBtn); }, '#444');
+  const dBtn = mkBtn('D', () => { fireIronKey('right'); flash(dBtn); }, '#444');
+
+  wasdContainer.appendChild(wBtn);
+  wasdContainer.appendChild(aBtn);
+  wasdContainer.appendChild(sBtn);
+  wasdContainer.appendChild(dBtn);
 
   document.body.appendChild(ui);
 
-  /* ---------------- Helpers ---------------- */
+  /* ---------------- Styles ---------------- */
+  const style = document.createElement('style');
+  style.textContent = `
+    #katapultControlUI button.flash {
+      background: #00c8ff !important;
+      color: #000 !important;
+      transition: background 0.1s;
+    }
+  `;
+  document.head.appendChild(style);
+
+  /* ---------------- Shadow DOM Helpers ---------------- */
+  function deepQuerySelectorAll(selector, root = document) {
+    const results = [];
+    (function walk(node) {
+      if (!node) return;
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        if (node.matches?.(selector)) results.push(node);
+        if (node.shadowRoot) walk(node.shadowRoot);
+      }
+      node.children && [...node.children].forEach(walk);
+    })(root);
+    return results;
+  }
+
+  /* ---------------- Paper-item W/S ---------------- */
+  let index = 0;
+  function items() { return deepQuerySelectorAll("paper-item.row"); }
+  function syncIndex() {
+    const list = items();
+    const i = list.findIndex(el => el.hasAttribute("selected"));
+    if (i !== -1) index = i;
+  }
+  function selectItem(i) {
+    const list = items();
+    if (!list.length) return;
+    index = Math.max(0, Math.min(i, list.length - 1));
+    const el = list[index];
+    el.focus();
+    el.click();
+    el.scrollIntoView({ block: "nearest" });
+  }
+
+  /* ---------------- Photo Viewer ---------------- */
   function findAllPhotoViewers(root, out = []) {
     if (!root) return out;
     if (root.tagName === 'KATAPULT-PHOTO-VIEWER') out.push(root);
@@ -47,93 +129,93 @@ javascript:(() => {
     if (root.children) [...root.children].forEach(c => findAllPhotoViewers(c, out));
     return out;
   }
-
   function virtualClick(el) {
     const r = el.getBoundingClientRect();
-    const x = r.left + r.width / 2;
-    const y = r.top + r.height / 2;
+    const x = r.left + r.width/2;
+    const y = r.top + r.height/2;
     ['mouseover','mousedown','mouseup','click'].forEach(t =>
-      el.dispatchEvent(new MouseEvent(t, { bubbles:true, clientX:x, clientY:y }))
+      el.dispatchEvent(new MouseEvent(t, {bubbles:true, clientX:x, clientY:y}))
     );
   }
-
   function clickLastThumbnail() {
     if (paused || panelHandled) return;
     const root = document.querySelector('#pageElement')?.shadowRoot;
     if (!root) return;
-
     const viewers = findAllPhotoViewers(root);
     if (!viewers.length) return;
-
-    const last = viewers[viewers.length - 1];
     panelHandled = true;
-    virtualClick(last);
-    console.log('Opened last thumbnail:', last.id);
+    virtualClick(viewers[viewers.length-1]);
   }
-
   function starCurrent() {
-    if (!currentUUID) return console.log('No focused photo UUID');
+    if (!currentUUID) return;
     const root = document.querySelector('#pageElement')?.shadowRoot;
     const panel = root?.querySelector('katapult-tool-panel#infoPanel')?.shadowRoot;
     if (!panel) return;
-
-    const pv = [...panel.querySelectorAll('katapult-photo-viewer')].find(p => p.id === currentUUID);
+    const pv = [...panel.querySelectorAll('katapult-photo-viewer')].find(p=>p.id===currentUUID);
     const star = pv?.querySelector('iron-icon.mainPhotoBadge[icon="star"]');
-    if (!star) return console.log('Star icon not found');
+    if (star) star.click();
+  }
 
-    star.click();
-    console.log('Star clicked for UUID:', currentUUID);
+  /* ---------------- Polymer Arrow Control ---------------- */
+  function fireIronKey(dir) {
+    const keyEl = deepQuerySelectorAll(`iron-a11y-keys[keys="${dir}"]`)[0];
+    if (!keyEl) return;
+    keyEl.dispatchEvent(new CustomEvent('keys-pressed',{
+      bubbles:true,
+      composed:true,
+      detail:{key:dir}
+    }));
+  }
+
+  /* ---------------- Flash visual ---------------- */
+  function flash(buttonEl) {
+    if (!buttonEl) return;
+    buttonEl.classList.add('flash');
+    setTimeout(()=>buttonEl.classList.remove('flash'),700);
   }
 
   /* ---------------- Keyboard ---------------- */
   function togglePause() {
     paused = !paused;
     pauseBtn.style.background = paused ? 'orange' : 'green';
-    console.log(paused ? 'Paused' : 'Resumed');
   }
-
   function keyHandler(e) {
     if (e.repeat) return;
-    if (e.ctrlKey) togglePause();
-    if (e.key === 'Shift') starCurrent();
-  }
+    if (e.target.tagName==='INPUT' || e.target.isContentEditable) return;
 
+    syncIndex();
+
+    if (e.ctrlKey) togglePause();
+    if (e.key==='Shift') { starCurrent(); flash(starBtn); }
+    if (e.key.toLowerCase()==='w') { selectItem(index-1); flash(wBtn); e.preventDefault(); }
+    if (e.key.toLowerCase()==='s') { selectItem(index+1); flash(sBtn); e.preventDefault(); }
+    if (e.key.toLowerCase()==='a') { fireIronKey('left'); flash(aBtn); e.preventDefault(); }
+    if (e.key.toLowerCase()==='d') { fireIronKey('right'); flash(dBtn); e.preventDefault(); }
+  }
   document.addEventListener('keydown', keyHandler);
 
   /* ---------------- XHR Hook ---------------- */
   const origOpen = XMLHttpRequest.prototype.open;
-  XMLHttpRequest.prototype.open = function (...args) {
-    this.addEventListener('load', () => {
-      if (stopped || paused) return;
+  XMLHttpRequest.prototype.open = function(...args){
+    this.addEventListener('load', ()=>{
+      if(stopped || paused) return;
       const url = this.responseURL || '';
-
-      // panel opened → thumbnails ready
-      if (url.includes('small.webp')) {
-        panelHandled = false;
-        setTimeout(clickLastThumbnail, 50);
-      }
-
-      // fullscreen photo → capture UUID
-      if (url.includes('extra_large.webp')) {
-        const m = url.match(/photos%2F([a-f0-9-]+)_/i);
-        if (m) {
-          currentUUID = m[1];
-          console.log('Focused photo UUID:', currentUUID);
-        }
+      if(url.includes('small.webp')) { panelHandled=false; setTimeout(clickLastThumbnail,50); }
+      if(url.includes('extra_large.webp')){
+        const m=url.match(/photos%2F([a-f0-9-]+)_/i);
+        if(m) currentUUID=m[1];
       }
     });
-    return origOpen.apply(this, args);
+    return origOpen.apply(this,args);
   };
 
   /* ---------------- Stop ---------------- */
-  function stopScript() {
-    stopped = true;
+  function stopScript(){
+    stopped=true;
     XMLHttpRequest.prototype.open = origOpen;
-    document.removeEventListener('keydown', keyHandler);
+    document.removeEventListener('keydown',keyHandler);
     ui.remove();
-    console.log('Script stopped and cleaned up');
   }
 
-  console.log('Listener active: small.webp → open last, large.webp → track UUID');
+  console.log('Full script with WASD flash + movable UI active.');
 })();
-
