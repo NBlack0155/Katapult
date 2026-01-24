@@ -18,13 +18,13 @@
     display: 'flex',
     flexDirection: 'column',
     gap: '6px',
-    cursor: 'move'
+    cursor: 'move' // indicate draggable
   });
 
   // Drag logic for entire container
   let dragOffsetX = 0, dragOffsetY = 0, dragging = false;
   ui.addEventListener('mousedown', e => {
-    if(e.target.tagName === 'BUTTON') return;
+    if(e.target.tagName === 'BUTTON') return; // buttons themselves not draggable
     dragging = true;
     const rect = ui.getBoundingClientRect();
     dragOffsetX = e.clientX - rect.left;
@@ -103,33 +103,18 @@
     return results;
   }
 
-  /* ---------------- Iron-list / Paper-item W/S ---------------- */
+  /* ---------------- Paper-item W/S ---------------- */
   let index = 0;
-
-  function getIronList() {
-    const container = document.querySelector('#pageElement')?.shadowRoot;
-    return container?.querySelector('iron-list');
-  }
-
-  function items() {
-    const list = getIronList();
-    if (!list) return [];
-    const rendered = list.querySelectorAll('paper-item.row');
-    return Array.from(rendered);
-  }
-
+  function items() { return deepQuerySelectorAll("paper-item.row"); }
   function syncIndex() {
     const list = items();
     const i = list.findIndex(el => el.hasAttribute("selected"));
     if (i !== -1) index = i;
   }
-
   function selectItem(i) {
     const list = items();
     if (!list.length) return;
     index = Math.max(0, Math.min(i, list.length - 1));
-    const ironList = getIronList();
-    if (ironList) ironList.scrollToIndex(index); // force rendering
     const el = list[index];
     el.focus();
     el.click();
@@ -144,7 +129,6 @@
     if (root.children) [...root.children].forEach(c => findAllPhotoViewers(c, out));
     return out;
   }
-
   function virtualClick(el) {
     const r = el.getBoundingClientRect();
     const x = r.left + r.width/2;
@@ -153,7 +137,6 @@
       el.dispatchEvent(new MouseEvent(t, {bubbles:true, clientX:x, clientY:y}))
     );
   }
-
   function clickLastThumbnail() {
     if (paused || panelHandled) return;
     const root = document.querySelector('#pageElement')?.shadowRoot;
@@ -163,7 +146,6 @@
     panelHandled = true;
     virtualClick(viewers[viewers.length-1]);
   }
-
   function starCurrent() {
     if (!currentUUID) return;
     const root = document.querySelector('#pageElement')?.shadowRoot;
@@ -197,7 +179,6 @@
     paused = !paused;
     pauseBtn.style.background = paused ? 'orange' : 'green';
   }
-
   function keyHandler(e) {
     if (e.repeat) return;
     if (e.target.tagName==='INPUT' || e.target.isContentEditable) return;
@@ -211,7 +192,6 @@
     if (e.key.toLowerCase()==='a') { fireIronKey('left'); flash(aBtn); e.preventDefault(); }
     if (e.key.toLowerCase()==='d') { fireIronKey('right'); flash(dBtn); e.preventDefault(); }
   }
-
   document.addEventListener('keydown', keyHandler);
 
   /* ---------------- XHR Hook ---------------- */
@@ -237,5 +217,5 @@
     ui.remove();
   }
 
-  console.log('Full script with WASD flash + movable UI + shadow-dom aware iron-list active.');
+  console.log('Full script with WASD flash + movable UI active.');
 })();
