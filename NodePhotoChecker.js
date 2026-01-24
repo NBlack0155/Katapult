@@ -84,7 +84,21 @@
     }
   `;
   document.head.appendChild(style);
-
+  
+  /* ---------------- Shadow DOM Helpers ---------------- */
+  function deepQuerySelectorAll(selector, root = document) {
+    const results = [];
+    (function walk(node) {
+      if (!node) return;
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        if (node.matches?.(selector)) results.push(node);
+        if (node.shadowRoot) walk(node.shadowRoot);
+      }
+      node.children && [...node.children].forEach(walk);
+    })(root);
+    return results;
+  }
+  
   /* ---------------- Photo Viewer ---------------- */
   function findAllPhotoViewers(root, out = []) {
     if (!root) return out;
