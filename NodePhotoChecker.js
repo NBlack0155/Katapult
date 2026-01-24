@@ -89,37 +89,46 @@
   `;
   document.head.appendChild(style);
 
-  /* ---------------- Shadow DOM Helpers ---------------- */
-  function deepQuerySelectorAll(selector, root = document) {
-    const results = [];
-    (function walk(node) {
-      if (!node) return;
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        if (node.matches?.(selector)) results.push(node);
-        if (node.shadowRoot) walk(node.shadowRoot);
-      }
-      node.children && [...node.children].forEach(walk);
-    })(root);
-    return results;
+  // --- Get the iron-list inside shadow DOM ---
+  function getIronList() {
+    const pageEl = document.querySelector('#pageElement')?.shadowRoot;
+    return pageEl?.querySelector('iron-list') || null;
+  }
+  
+  // --- Updated items function ---
+  function items() {
+    const list = [];
+    const ironList = getIronList();
+    if (!ironList?.items?.length) return list;
+  
+    // ensure all items are logically available for indexing
+    ironList.items.forEach((_, idx) => {
+      const el = deepQuerySelectorAll('paper-item.row', ironList)
+        .find(e => e.getAttribute('data-index') == idx);
+      if (el) list.push(el);
+    });
+    return list;
+  }
+  
+  // --- Updated selectItem ---
+  function selectItem(i) {
+    const ironList = getIronList();
+    if (!ironList || !ironList.items?.length) return;
+  
+    index = Math.max(0, Math.min(i, ironList.items.length - 1));
+    ironList.selected = index;  // force iron-list to render item
+  
+    setTimeout(() => {
+      const list = deepQuerySelectorAll('paper-item.row', ironList);
+      const el = list.find(e => e.hasAttribute('selected'));
+      if (!el) return;
+  
+      el.focus();
+      el.click();
+      el.scrollIntoView({ block: "nearest" });
+    }, 50); // slight delay to let iron-list render
   }
 
-  /* ---------------- Paper-item W/S ---------------- */
-  let index = 0;
-  function items() { return deepQuerySelectorAll("paper-item.row"); }
-  function syncIndex() {
-    const list = items();
-    const i = list.findIndex(el => el.hasAttribute("selected"));
-    if (i !== -1) index = i;
-  }
-  function selectItem(i) {
-    const list = items();
-    if (!list.length) return;
-    index = Math.max(0, Math.min(i, list.length - 1));
-    const el = list[index];
-    el.focus();
-    el.click();
-    el.scrollIntoView({ block: "nearest" });
-  }
 
   /* ---------------- Photo Viewer ---------------- */
   function findAllPhotoViewers(root, out = []) {
