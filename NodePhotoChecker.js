@@ -1,4 +1,88 @@
-javascript:(() => {
+(() => {
+  // ---------------- How To Modal ----------------
+  const modal = document.createElement('div');
+  Object.assign(modal.style, {
+    position: 'fixed',
+    top: '50px',
+    left: '50px',
+    width: '400px',
+    background: 'rgba(30,30,30,0.95)',
+    color: '#fff',
+    borderRadius: '8px',
+    padding: '12px',
+    zIndex: 99999,
+    boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+    cursor: 'move',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px'
+  });
+
+  let dragOffsetX = 0, dragOffsetY = 0, dragging = false;
+  modal.addEventListener('mousedown', e=>{
+    if(e.target.tagName==='BUTTON') return;
+    dragging = true;
+    const rect = modal.getBoundingClientRect();
+    dragOffsetX = e.clientX - rect.left;
+    dragOffsetY = e.clientY - rect.top;
+  });
+  document.addEventListener('mousemove', e=>{
+    if(!dragging) return;
+    modal.style.left = (e.clientX - dragOffsetX) + 'px';
+    modal.style.top = (e.clientY - dragOffsetY) + 'px';
+  });
+  document.addEventListener('mouseup', ()=>dragging=false);
+
+  // Header
+  const header = document.createElement('div');
+  header.textContent = 'How To Setup';
+  Object.assign(header.style,{fontWeight:'bold', fontSize:'16px'});
+  modal.appendChild(header);
+
+  // Instructions
+  const instructions = document.createElement('div');
+instructions.innerHTML =
+`1. Filter Obstacles: Node Type Equals Obstacle<br>
+2. Verify Obstacles are Filtered By Clicking into Search Poles/Location.<br>
+3. Click on a Node and click Edit.<br>
+4. Open Tabs PHOTOS, NODE ATTRIBUTES and UNDERGROUND.<br>
+5. Click Continue, rest of tool kit will load.<br>
+6. Click Cancel if you want to exit.<br>`;
+
+  modal.appendChild(instructions);
+
+  // Buttons container
+  const btnContainer = document.createElement('div');
+  Object.assign(btnContainer.style,{display:'flex',justifyContent:'flex-end',gap:'6px'});
+  modal.appendChild(btnContainer);
+
+  // Cancel button
+  const cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'Cancel';
+  Object.assign(cancelBtn.style,{padding:'6px 12px',cursor:'pointer',background:'crimson',color:'#fff',borderRadius:'4px',border:'none'});
+  cancelBtn.onclick = () => {
+    modal.remove();
+    console.log('Script cancelled by user');
+  };
+  btnContainer.appendChild(cancelBtn);
+
+  // Continue button
+  const continueBtn = document.createElement('button');
+  continueBtn.textContent = 'Continue';
+  Object.assign(continueBtn.style,{padding:'6px 12px',cursor:'pointer',background:'green',color:'#fff',borderRadius:'4px',border:'none'});
+  btnContainer.appendChild(continueBtn);
+
+  document.body.appendChild(modal);
+
+  continueBtn.onclick = () => {
+    modal.remove();
+    console.log('User confirmed How To, starting main script...');
+    startMainScript(); // function where your full script starts
+  };
+
+  // ---------------- Main Script Starter ----------------
+  function startMainScript() {
+    javascript:(() => {
   let paused = false;
   let stopped = false;
   let panelHandled = false;
@@ -246,4 +330,6 @@ addTooltip(dBtn, 'Press to go RIGHT in Photos');
   }
 
   console.log('Master script fully initialized');
+})();
+  }
 })();
