@@ -18,7 +18,7 @@
   }
 
   // ---------- Prompt ----------
-  const nodeId = prompt('Enter Node ID ***Make sure Edit Window is Open Already***');
+  const nodeId = prompt('Enter Node ID ***Make sure edit window is open***');
   if (!nodeId) return console.log('No nodeId entered');
 
   // ---------- Open node (THIS IS THE CORE) ----------
