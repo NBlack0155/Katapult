@@ -65,7 +65,7 @@
   }
 
   // Hard center, aggressive zoom
-  gmap.setZoom(20);
+  gmap.setZoom(23);
   gmap.setCenter({ lat, lng });
 
   console.log('Node opened and map centered');
