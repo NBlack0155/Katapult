@@ -21,11 +21,27 @@
   // ---------- Prompt for Connection ID ----------
   const connectionId = prompt('Enter Connection ID ***Make sure edit window is open***');
 
-  // ---------- Find katapult map ----------
-  const map = deepQuerySelector(document, 'katapult-map');
+  // ---------- Find katapult map element ----------
+  const mapEl = deepQuerySelector(document, 'katapult-map');
+
+  // ---------- Get internal controller dynamically ----------
+  const controller = (() => {
+    // Try the component itself first
+    if (typeof mapEl.zoomToConnection === 'function') return mapEl;
+    // Otherwise search for nested object that has zoomToConnection
+    for (const k in mapEl) {
+      if (mapEl[k] && typeof mapEl[k].zoomToConnection === 'function') return mapEl[k];
+    }
+    return null;
+  })();
+
+  if (!controller) {
+    console.error("Couldn't find map controller!");
+    return;
+  }
 
   // ---------- Get Job ID dynamically ----------
-  const jobId = map.__data?.jobId;
+  const jobId = mapEl.__data?.jobId;
 
   // ---------- Construct fake event detail ----------
   const fakeEvent = {
@@ -38,7 +54,9 @@
   };
 
   // ---------- Call selectConnection directly ----------
-  map.selectConnection(fakeEvent);
-  __katapultController.zoomToConnection(connectionId);
-  
+  mapEl.selectConnection(fakeEvent);
+
+  // ---------- Zoom to connection ----------
+  controller.zoomToConnection(connectionId);
+
 })();
