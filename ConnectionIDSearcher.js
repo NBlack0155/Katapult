@@ -39,5 +39,6 @@
 
   // ---------- Call selectConnection directly ----------
   map.selectConnection(fakeEvent);
-
+  __katapultController.zoomToConnection(connectionId);
+  
 })();
