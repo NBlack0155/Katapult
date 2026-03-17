@@ -40,6 +40,15 @@
     return;
   }
 
+    // ---------- Force max zoom ----------
+  if (controller.map) {
+    const originalSetZoom = controller.map.setZoom;
+    controller.map.setZoom = function (zoom) {
+      if (zoom === 18) zoom = 23;
+      return originalSetZoom.call(this, zoom);
+    };
+  }
+
   // ---------- Get Job ID dynamically ----------
   const jobId = mapEl.__data?.jobId;
 
