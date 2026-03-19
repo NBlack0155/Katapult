@@ -1,6 +1,5 @@
 (() => {
 
-  // ---------- Shadow DOM helper ----------
   function deepQuerySelector(root, selector) {
     const walk = n => {
       if (!n) return null;
@@ -18,17 +17,12 @@
     return walk(root);
   }
 
-  // ---------- Prompt for Connection ID ----------
-  const nodeId = prompt('Enter Connection ID ***Make sure edit window is open***');
+  const nodeId = prompt('Enter Node ID ***Make sure edit window is open***');
 
-  // ---------- Find katapult map element ----------
   const mapEl = deepQuerySelector(document, 'katapult-map');
 
-  // ---------- Get internal controller dynamically ----------
   const controller = (() => {
-    // Try the component itself first
     if (typeof mapEl.zoomToNode === 'function') return mapEl;
-    // Otherwise search for nested object that has zoomToNode
     for (const k in mapEl) {
       if (mapEl[k] && typeof mapEl[k].zoomToNode === 'function') return mapEl[k];
     }
@@ -40,40 +34,38 @@
     return;
   }
 
-    // ---------- Force max zoom ----------
-  let originalSetZoom;
-  
-  if (controller.map) {
-    originalSetZoom = controller.map.setZoom;
-  
-    controller.map.setZoom = function (zoom) {
-      if (zoom === 18) zoom = 23;
-      return originalSetZoom.call(this, zoom);
-    };
-  }
-
-  // ---------- Get Job ID dynamically ----------
   const jobId = mapEl.__data?.jobId;
 
-  // ---------- Construct fake event detail ----------
   const fakeEvent = {
     detail: {
-      key: nodeId,  // use prompted Node ID
-      jobId: jobId,       // dynamically retrieved Job ID
+      key: nodeId,
+      jobId: jobId,
       type: 'node',
       domEvent: null
     }
   };
 
-  // ---------- Call selectnode directly ----------
+  // ---------- select node first ----------
   mapEl.selectNode(fakeEvent);
 
-  // ---------- Zoom to node ----------
+  // ---------- let app do its normal zoom ----------
   controller.zoomToNode(nodeId);
-  
-  // ---------- Restore original zoom function ----------
-  if (controller?.map && originalSetZoom) {
-    controller.map.setZoom = originalSetZoom;
-  }
-  
+
+  // ---------- post-zoom adjustment (safe hook) ----------
+  requestAnimationFrame(() => {
+    try {
+      const map = controller.map;
+      if (!map?.getZoom) return;
+
+      const current = map.getZoom();
+
+      // only adjust if app lands on the "bad" zoom
+      if (current === 18) {
+        map.setZoom(23);
+      }
+    } catch (e) {
+      console.warn("Zoom adjustment skipped:", e);
+    }
+  });
+
 })();
