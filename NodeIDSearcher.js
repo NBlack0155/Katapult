@@ -1,5 +1,6 @@
 (() => {
-  // ---------- Shadow helper ----------
+
+  // ---------- Shadow DOM helper ----------
   function deepQuerySelector(root, selector) {
     const walk = n => {
       if (!n) return null;
@@ -17,56 +18,62 @@
     return walk(root);
   }
 
-  // ---------- Prompt ----------
-  const nodeId = prompt('Enter Node ID ***Make sure edit window is open***');
-  if (!nodeId) return console.log('No nodeId entered');
+  // ---------- Prompt for Connection ID ----------
+  const nodeId = prompt('Enter Connection ID ***Make sure edit window is open***');
 
-  // ---------- Open node (THIS IS THE CORE) ----------
-  const map = deepQuerySelector(document, 'katapult-map');
-  if (!map) return console.log('katapult-map not found');
+  // ---------- Find katapult map element ----------
+  const mapEl = deepQuerySelector(document, 'katapult-map');
 
-  const jobId = map.__data?.jobId;
-  if (!jobId) return console.log('jobId not found');
+  // ---------- Get internal controller dynamically ----------
+  const controller = (() => {
+    // Try the component itself first
+    if (typeof mapEl.zoomToNode === 'function') return mapEl;
+    // Otherwise search for nested object that has zoomToNode
+    for (const k in mapEl) {
+      if (mapEl[k] && typeof mapEl[k].zoomToNode === 'function') return mapEl[k];
+    }
+    return null;
+  })();
 
-  map.dispatchEvent(new CustomEvent('select-item', {
+  if (!controller) {
+    console.error("Couldn't find map controller!");
+    return;
+  }
+
+    // ---------- Force max zoom ----------
+  let originalSetZoom;
+  
+  if (controller.map) {
+    originalSetZoom = controller.map.setZoom;
+  
+    controller.map.setZoom = function (zoom) {
+      if (zoom === 18) zoom = 23;
+      return originalSetZoom.call(this, zoom);
+    };
+  }
+
+  // ---------- Get Job ID dynamically ----------
+  const jobId = mapEl.__data?.jobId;
+
+  // ---------- Construct fake event detail ----------
+  const fakeEvent = {
     detail: {
-      key: nodeId,
-      jobId,
+      key: nodeId,  // use prompted Node ID
+      jobId: jobId,       // dynamically retrieved Job ID
       type: 'node',
-      actionTaken: false
-    },
-    bubbles: true,
-    composed: true
-  }));
+      domEvent: null
+    }
+  };
 
-  // ---------- Optional: zoom to node coordinates ----------
-  const info = deepQuerySelector(document, '.smallInfo');
-  if (!info) {
-    console.log('Node opened; no coordinates found for zoom');
-    return;
+  // ---------- Call selectnode directly ----------
+  mapEl.selectNode(fakeEvent);
+
+  // ---------- Zoom to node ----------
+  controller.zoomToNode(nodeId);
+  
+  // ---------- Restore original zoom function ----------
+  if (controller?.map && originalSetZoom) {
+    controller.map.setZoom = originalSetZoom;
   }
-
-  const [lat, lng] = info.textContent.split(',').map(Number);
-  if (Number.isNaN(lat) || Number.isNaN(lng)) {
-    console.log('Node opened; invalid coordinates');
-    return;
-  }
-
-  const gmapEl = deepQuerySelector(map.shadowRoot, 'google-map');
-  const gmap =
-    gmapEl?.map ||
-    gmapEl?.__map ||
-    gmapEl?._map ||
-    gmapEl?.__data?.map;
-
-  if (!gmap) {
-    console.log('Node opened; map instance unavailable');
-    return;
-  }
-
-  // Hard center, aggressive zoom
-  gmap.setZoom(23);
-  gmap.setCenter({ lat, lng });
-
-  console.log('Node opened and map centered');
+  
 })();
