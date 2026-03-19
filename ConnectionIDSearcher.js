@@ -1,6 +1,5 @@
 (() => {
 
-  // ---------- Shadow DOM helper ----------
   function deepQuerySelector(root, selector) {
     const walk = n => {
       if (!n) return null;
@@ -17,18 +16,13 @@
     };
     return walk(root);
   }
-
-  // ---------- Prompt for Connection ID ----------
+  
   const connectionId = prompt('Enter Connection ID ***Make sure edit window is open***');
-
-  // ---------- Find katapult map element ----------
+  
   const mapEl = deepQuerySelector(document, 'katapult-map');
 
-  // ---------- Get internal controller dynamically ----------
   const controller = (() => {
-    // Try the component itself first
     if (typeof mapEl.zoomToConnection === 'function') return mapEl;
-    // Otherwise search for nested object that has zoomToConnection
     for (const k in mapEl) {
       if (mapEl[k] && typeof mapEl[k].zoomToConnection === 'function') return mapEl[k];
     }
@@ -40,19 +34,8 @@
     return;
   }
 
-    // ---------- Force max zoom ----------
-  if (controller.map) {
-    const originalSetZoom = controller.map.setZoom;
-    controller.map.setZoom = function (zoom) {
-      if (zoom === 18) zoom = 23;
-      return originalSetZoom.call(this, zoom);
-    };
-  }
-
-  // ---------- Get Job ID dynamically ----------
   const jobId = mapEl.__data?.jobId;
 
-  // ---------- Construct fake event detail ----------
   const fakeEvent = {
     detail: {
       key: connectionId,  // use prompted Connection ID
@@ -62,10 +45,26 @@
     }
   };
 
-  // ---------- Call selectConnection directly ----------
   mapEl.selectConnection(fakeEvent);
 
-  // ---------- Zoom to connection ----------
+  // ---------- let app do its normal zoom ----------
   controller.zoomToConnection(connectionId);
+
+  // ---------- post-zoom adjustment (safe hook) ----------
+  requestAnimationFrame(() => {
+    try {
+      const map = controller.map;
+      if (!map?.getZoom) return;
+
+      const current = map.getZoom();
+
+      // only adjust if app lands on the "bad" zoom
+      if (current === 18) {
+        map.setZoom(23);
+      }
+    } catch (e) {
+      console.warn("Zoom adjustment skipped:", e);
+    }
+  });
 
 })();
