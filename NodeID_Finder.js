@@ -15,7 +15,7 @@ async function findJobIdByNodeId() {
       return null;
     }
 
-    const jobIds = Object.keys(jobList);
+    const jobIds = Object.keys(jobList).reverse();
     const batchSize = 10;
 
     console.log(`Scanning ${jobIds.length} jobs (batch size ${batchSize})...`);
@@ -46,9 +46,13 @@ async function findJobIdByNodeId() {
           console.log("MATCH FOUND");
           console.log("jobId:", r.jobId);
           console.log("nodeId:", nodeId);
-
-          alert(`FOUND JOB:\n${r.jobId}`);
-
+          
+          try {
+            await navigator.clipboard.writeText(r.jobId);
+          } catch {}
+          
+          prompt("Job Found (copied to clipboard):", r.jobId);
+          
           return r.jobId;
         }
       }
