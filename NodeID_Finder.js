@@ -64,4 +64,5 @@ async function findJobIdByNodeId() {
     return null;
   }
 }
+findJobIdByNodeId();
 })();
