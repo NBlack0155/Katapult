@@ -47,11 +47,8 @@ async function findJobIdByNodeId() {
           console.log("jobId:", r.jobId);
           console.log("nodeId:", nodeId);
           
-          try {
-            await navigator.clipboard.writeText(r.jobId);
-          } catch {}
           
-          prompt("Job Found (copied to clipboard):", r.jobId);
+          prompt("Job Found (Make sure to copy before Clicking OK):", r.jobId);
           
           return r.jobId;
         }
