@@ -1,3 +1,4 @@
+(() => {
 async function findJobIdByNodeId() {
   const nodeId = prompt("Enter Node ID:");
   if (!nodeId) return;
