@@ -47,8 +47,8 @@ async function findJobIdByConnectionId() {
           console.log("jobId:", r.jobId);
           console.log("connectionId:", connectionId);
           
-          
-          prompt("Job Found (Make sure to copy before Clicking OK):", r.jobId);
+          const url = 'https://ecc.katapultpro.com/map/#${r.jobId}/n${connectionID}';
+          prompt("Job Found (Make sure to copy before Clicking OK):", url);
           
           return r.jobId;
         }
