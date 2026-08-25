@@ -5,7 +5,7 @@ async function findJobIdByNodeId() {
 
   try {
     const snap = await FirebaseWorker
-      .ref('photoheight/job_permissions/ervin_cable_construction_llc/list')
+      .ref('photoheight/job_permissions/-Os2Y1uLFmB9CqVnQG3c/list')
       .once('value');
 
     const jobList = snap.val();
